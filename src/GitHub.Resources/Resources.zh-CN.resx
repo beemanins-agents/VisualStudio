@@ -127,7 +127,7 @@
     <value>从 GitHub 打开</value>
   </data>
   <data name="CouldNotConnectToGitHub" xml:space="preserve">
-    <value>无法连接到github.com</value>
+    <value>无法连接到 github.com</value>
   </data>
   <data name="CreateGistTitle" xml:space="preserve">
     <value>创建一个GitHub Gist</value>
