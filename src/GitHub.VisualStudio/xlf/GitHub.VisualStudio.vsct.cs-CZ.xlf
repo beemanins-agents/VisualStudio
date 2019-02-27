@@ -2,9 +2,9 @@
 <xliff xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="urn:oasis:names:tc:xliff:document:1.2" version="1.2" xsi:schemaLocation="urn:oasis:names:tc:xliff:document:1.2 xliff-core-1.2-transitional.xsd">
   <file datatype="xml" source-language="en" target-language="cs" original="../GitHub.VisualStudio.vsct">
     <body>
-      <trans-unit id="addConnectionCommand|ButtonText">
+      <trans-unit id="addConnectionCommand|ButtonText" approved="yes">
         <source>&amp;Connect to GitHub</source>
-        <target xml:lang="cs" state="needs-translation">&amp;Connect to GitHub</target>
+        <target xml:lang="cs" state="translated">&amp;Připojit ke GitHubu</target>
         <note/>
       </trans-unit>
       <trans-unit id="addConnectionCommand|LocCanonicalName">
@@ -12,9 +12,9 @@
         <target xml:lang="cs" state="needs-translation">.GitHub.ConnectToGitHub</target>
         <note/>
       </trans-unit>
-      <trans-unit id="backCommand|ButtonText">
+      <trans-unit id="backCommand|ButtonText" approved="yes">
         <source>Back</source>
-        <target xml:lang="cs" state="needs-translation">Back</target>
+        <target xml:lang="cs" state="translated">Zpět</target>
         <note/>
       </trans-unit>
       <trans-unit id="backCommand|LocCanonicalName">
@@ -22,9 +22,9 @@
         <target xml:lang="cs" state="needs-translation">.GitHub.Back</target>
         <note/>
       </trans-unit>
-      <trans-unit id="copyLinkCommand|ButtonText">
+      <trans-unit id="copyLinkCommand|ButtonText" approved="yes">
         <source>Copy link to clipboard</source>
-        <target xml:lang="cs" state="needs-translation">Copy link to clipboard</target>
+        <target xml:lang="cs" state="translated">Zkopírovat odkaz do schránky</target>
         <note/>
       </trans-unit>
       <trans-unit id="copyLinkCommand|LocCanonicalName">
@@ -32,9 +32,9 @@
         <target xml:lang="cs" state="needs-translation">.GitHub.CopyLink</target>
         <note/>
       </trans-unit>
-      <trans-unit id="forwardCommand|ButtonText">
+      <trans-unit id="forwardCommand|ButtonText" approved="yes">
         <source>Forward</source>
-        <target xml:lang="cs" state="needs-translation">Forward</target>
+        <target xml:lang="cs" state="translated">Vpřed</target>
         <note/>
       </trans-unit>
       <trans-unit id="forwardCommand|LocCanonicalName">
@@ -42,9 +42,9 @@
         <target xml:lang="cs" state="needs-translation">.GitHub.Forward</target>
         <note/>
       </trans-unit>
-      <trans-unit id="githubCommand|ButtonText">
+      <trans-unit id="githubCommand|ButtonText" approved="yes">
         <source>View on GitHub</source>
-        <target xml:lang="cs" state="needs-translation">View on GitHub</target>
+        <target xml:lang="cs" state="translated">Zobrazit na GitHubu</target>
         <note/>
       </trans-unit>
       <trans-unit id="githubCommand|LocCanonicalName">
@@ -52,9 +52,9 @@
         <target xml:lang="cs" state="needs-translation">.GitHub.ViewOnGitHub</target>
         <note/>
       </trans-unit>
-      <trans-unit id="goToSolutionOrPullRequestFileCommand|ButtonText">
+      <trans-unit id="goToSolutionOrPullRequestFileCommand|ButtonText" approved="yes">
         <source>Go To Solution/PR File</source>
-        <target xml:lang="cs" state="needs-translation">Go To Solution/PR File</target>
+        <target xml:lang="cs" state="translated">Přejít k řešení nebo souboru PR</target>
         <note/>
       </trans-unit>
       <trans-unit id="goToSolutionOrPullRequestFileCommand|LocCanonicalName">
@@ -62,9 +62,9 @@
         <target xml:lang="cs" state="needs-translation">.GitHub.GoToSolutionOrPRFile</target>
         <note/>
       </trans-unit>
-      <trans-unit id="helpCommand|ButtonText">
+      <trans-unit id="helpCommand|ButtonText" approved="yes">
         <source>Help</source>
-        <target xml:lang="cs" state="needs-translation">Help</target>
+        <target xml:lang="cs" state="translated">Nápověda</target>
         <note/>
       </trans-unit>
       <trans-unit id="helpCommand|LocCanonicalName">
@@ -72,9 +72,9 @@
         <target xml:lang="cs" state="needs-translation">.GitHub.Help</target>
         <note/>
       </trans-unit>
-      <trans-unit id="idBlameCommand|ButtonText">
+      <trans-unit id="idBlameCommand|ButtonText" approved="yes">
         <source>Blame</source>
-        <target xml:lang="cs" state="needs-translation">Blame</target>
+        <target xml:lang="cs" state="translated">Příčina</target>
         <note/>
       </trans-unit>
       <trans-unit id="idBlameCommand|LocCanonicalName">
@@ -82,9 +82,9 @@
         <target xml:lang="cs" state="needs-translation">.GitHub.Blame</target>
         <note/>
       </trans-unit>
-      <trans-unit id="idCreateGistCommand|ButtonText">
+      <trans-unit id="idCreateGistCommand|ButtonText" approved="yes">
         <source>Create a GitHub Gist</source>
-        <target xml:lang="cs" state="needs-translation">Create a GitHub Gist</target>
+        <target xml:lang="cs" state="translated">Vytvořit gist GitHubu</target>
         <note/>
       </trans-unit>
       <trans-unit id="idCreateGistCommand|LocCanonicalName">
@@ -92,9 +92,9 @@
         <target xml:lang="cs" state="needs-translation">.GitHub.CreateGist</target>
         <note/>
       </trans-unit>
-      <trans-unit id="idCreateGistEnterpriseCommand|ButtonText">
+      <trans-unit id="idCreateGistEnterpriseCommand|ButtonText" approved="yes">
         <source>Create an Enterprise Gist</source>
-        <target xml:lang="cs" state="needs-translation">Create an Enterprise Gist</target>
+        <target xml:lang="cs" state="translated">Vytvořit gist Enterprise</target>
         <note/>
       </trans-unit>
       <trans-unit id="idCreateGistEnterpriseCommand|LocCanonicalName">
@@ -122,9 +122,9 @@
         <target xml:lang="cs" state="needs-translation">Window Toolbar</target>
         <note/>
       </trans-unit>
-      <trans-unit id="openFromClipboardCommand|ButtonText">
+      <trans-unit id="openFromClipboardCommand|ButtonText" approved="yes">
         <source>Open from clipboard</source>
-        <target xml:lang="cs" state="needs-translation">Open from clipboard</target>
+        <target xml:lang="cs" state="translated">Otevřít ze schránky</target>
         <note/>
       </trans-unit>
       <trans-unit id="openFromClipboardCommand|LocCanonicalName">
@@ -132,9 +132,9 @@
         <target xml:lang="cs" state="needs-translation">.GitHub.OpenFromClipboard</target>
         <note/>
       </trans-unit>
-      <trans-unit id="openFromUrlCommand|ButtonText">
+      <trans-unit id="openFromUrlCommand|ButtonText" approved="yes">
         <source>Open from GitHub...</source>
-        <target xml:lang="cs" state="needs-translation">Open from GitHub...</target>
+        <target xml:lang="cs" state="translated">Otevřít z GitHubu...</target>
         <note/>
       </trans-unit>
       <trans-unit id="openFromUrlCommand|LocCanonicalName">
@@ -142,9 +142,9 @@
         <target xml:lang="cs" state="needs-translation">.GitHub.OpenFromUrl</target>
         <note/>
       </trans-unit>
-      <trans-unit id="openLinkCommand|ButtonText">
+      <trans-unit id="openLinkCommand|ButtonText" approved="yes">
         <source>Open on GitHub</source>
-        <target xml:lang="cs" state="needs-translation">Open on GitHub</target>
+        <target xml:lang="cs" state="translated">Otevřít na GitHubu</target>
         <note/>
       </trans-unit>
       <trans-unit id="openLinkCommand|LocCanonicalName">
@@ -152,9 +152,9 @@
         <target xml:lang="cs" state="needs-translation">.GitHub.OpenLink</target>
         <note/>
       </trans-unit>
-      <trans-unit id="pullRequestCommand|ButtonText">
+      <trans-unit id="pullRequestCommand|ButtonText" approved="yes">
         <source>Pull Requests</source>
-        <target xml:lang="cs" state="needs-translation">Pull Requests</target>
+        <target xml:lang="cs" state="translated">Žádosti o přijetí změn</target>
         <note/>
       </trans-unit>
       <trans-unit id="pullRequestCommand|LocCanonicalName">
@@ -162,9 +162,9 @@
         <target xml:lang="cs" state="needs-translation">.GitHub.PullRequests</target>
         <note/>
       </trans-unit>
-      <trans-unit id="refreshCommand|ButtonText">
+      <trans-unit id="refreshCommand|ButtonText" approved="yes">
         <source>Refresh</source>
-        <target xml:lang="cs" state="needs-translation">Refresh</target>
+        <target xml:lang="cs" state="translated">Aktualizovat</target>
         <note/>
       </trans-unit>
       <trans-unit id="refreshCommand|LocCanonicalName">
@@ -172,9 +172,9 @@
         <target xml:lang="cs" state="needs-translation">.GitHub.Refresh</target>
         <note/>
       </trans-unit>
-      <trans-unit id="showCurrentPullRequestCommand|ButtonText">
+      <trans-unit id="showCurrentPullRequestCommand|ButtonText" approved="yes">
         <source>Show Current Pull Request</source>
-        <target xml:lang="cs" state="needs-translation">Show Current Pull Request</target>
+        <target xml:lang="cs" state="translated">Zobrazit aktuální žádost o přijetí změn</target>
         <note/>
       </trans-unit>
       <trans-unit id="showCurrentPullRequestCommand|LocCanonicalName">
@@ -192,9 +192,9 @@
         <target xml:lang="cs" state="needs-translation">.GitHub.ShowGitHubPane</target>
         <note/>
       </trans-unit>
-      <trans-unit id="syncSubmodulesCommand|ButtonText">
+      <trans-unit id="syncSubmodulesCommand|ButtonText" approved="yes">
         <source>Sync Submodules</source>
-        <target xml:lang="cs" state="needs-translation">Sync Submodules</target>
+        <target xml:lang="cs" state="translated">Synchronizovat dílčí moduly</target>
         <note/>
       </trans-unit>
       <trans-unit id="syncSubmodulesCommand|LocCanonicalName">
