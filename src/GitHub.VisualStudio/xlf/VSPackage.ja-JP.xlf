@@ -7,9 +7,9 @@
         <target xml:lang="ja" state="needs-translation">GitHub.VisualStudio</target>
         <note/>
       </trans-unit>
-      <trans-unit id="112">
+      <trans-unit id="112" approved="yes">
         <source>A Visual Studio Extension that brings the GitHub Flow into Visual Studio.</source>
-        <target xml:lang="ja" state="needs-translation">A Visual Studio Extension that brings the GitHub Flow into Visual Studio.</target>
+        <target xml:lang="ja" state="translated">GitHub Flow を Visual Studio で利用できるようにする Visual Studio 拡張機能。</target>
         <note/>
       </trans-unit>
     </body>
