@@ -358,10 +358,10 @@ https://git-scm.com/download/win</value>
     <value>{0:N0} 分钟前</value>
   </data>
   <data name="month" xml:space="preserve">
-    <value>{0:N0} 月前</value>
+    <value>{0:N0} 个月前</value>
   </data>
   <data name="months" xml:space="preserve">
-    <value>{0:N0} 月前</value>
+    <value>{0:N0} 个月前</value>
   </data>
   <data name="second" xml:space="preserve">
     <value>{0:N0} 秒前</value>
