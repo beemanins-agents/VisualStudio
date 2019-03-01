@@ -848,4 +848,37 @@ https://git-scm.com/download/win</value>
   <data name="MostRecentlyPushed" xml:space="preserve">
     <value>Отправлено последний раз: {0}</value>
   </data>
+  <data name="OpenConversation" xml:space="preserve">
+    <value>Открыть беседу</value>
+  </data>
+  <data name="Comment" xml:space="preserve">
+    <value>Комментарий</value>
+  </data>
+  <data name="ClosePullRequest" xml:space="preserve">
+    <value>Закрыть запрос на включение внесенных изменений</value>
+  </data>
+  <data name="CloseIssue" xml:space="preserve">
+    <value>Закрыть обращение</value>
+  </data>
+  <data name="CloseAndComment" xml:space="preserve">
+    <value>Закрыть и прокомментировать</value>
+  </data>
+  <data name="ReopenAndComment" xml:space="preserve">
+    <value>Повторно открыть и прокомментировать</value>
+  </data>
+  <data name="ReopenIssue" xml:space="preserve">
+    <value>Повторно открыть обращение</value>
+  </data>
+  <data name="ReopenPullRequest" xml:space="preserve">
+    <value>Повторно открыть запрос на включение внесенных изменений</value>
+  </data>
+  <data name="CommitCountFormat" xml:space="preserve">
+    <value>Фиксаций: {0}</value>
+  </data>
+  <data name="AddedSomeCommits" xml:space="preserve">
+    <value>добавляет некоторые фиксации</value>
+  </data>
+  <data name="AndOthers" xml:space="preserve">
+    <value>и др.</value>
+  </data>
 </root>
