@@ -1,7 +1,6 @@
 ﻿using System;
 using GitHub.VisualStudio.Helpers;
 using Microsoft.TeamFoundation.Controls;
-using NullGuard;
 using GitHub.Services;
 using System.Diagnostics;
 using GitHub.Api;
@@ -13,7 +12,7 @@ namespace GitHub.VisualStudio.Base
 {
     public class TeamExplorerSectionBase : TeamExplorerItemBase, ITeamExplorerSection, IServiceProviderAware
     {
-        protected IConnectionManager connectionManager;
+        protected IConnectionManager ConnectionManager { get; set; }
 
         bool isBusy;
         public bool IsBusy
@@ -30,7 +29,6 @@ namespace GitHub.VisualStudio.Base
         }
 
         object sectionContent;
-        [AllowNull]
         public object SectionContent
         {
             get { return sectionContent; }
@@ -38,44 +36,61 @@ namespace GitHub.VisualStudio.Base
         }
 
         string title;
-        [AllowNull]
         public string Title
         {
             get { return title; }
             set { title = value; this.RaisePropertyChange(); }
         }
 
-        [return: AllowNull]
         public virtual object GetExtensibilityService(Type serviceType)
         {
             return null;
         }
 
-        public TeamExplorerSectionBase(ITeamExplorerServiceHolder holder)
-            : base(holder)
+        public TeamExplorerSectionBase(IGitHubServiceProvider serviceProvider, ITeamExplorerServiceHolder holder)
+            : base(serviceProvider, holder)
         {
+            Guard.ArgumentNotNull(serviceProvider, nameof(serviceProvider));
+            Guard.ArgumentNotNull(holder, nameof(holder));
+
             IsVisible = false;
             IsEnabled = true;
             IsExpanded = true;
         }
 
-        public TeamExplorerSectionBase(ISimpleApiClientFactory apiFactory, ITeamExplorerServiceHolder holder)
-            : base(apiFactory, holder)
+        public TeamExplorerSectionBase(IGitHubServiceProvider serviceProvider,
+            ISimpleApiClientFactory apiFactory, ITeamExplorerServiceHolder holder)
+            : base(serviceProvider, apiFactory, holder)
         {
+            Guard.ArgumentNotNull(serviceProvider, nameof(serviceProvider));
+            Guard.ArgumentNotNull(apiFactory, nameof(apiFactory));
+            Guard.ArgumentNotNull(holder, nameof(holder));
+
             IsVisible = false;
             IsEnabled = true;
             IsExpanded = true;
         }
 
-        public TeamExplorerSectionBase(ITeamExplorerServiceHolder holder, IConnectionManager cm) : this(holder)
+        public TeamExplorerSectionBase(IGitHubServiceProvider serviceProvider,
+            ITeamExplorerServiceHolder holder, IConnectionManager cm) : this(serviceProvider, holder)
         {
-            connectionManager = cm;
+            Guard.ArgumentNotNull(serviceProvider, nameof(serviceProvider));
+            Guard.ArgumentNotNull(holder, nameof(holder));
+            Guard.ArgumentNotNull(cm, nameof(cm));
+
+            ConnectionManager = cm;
         }
 
-        public TeamExplorerSectionBase(ISimpleApiClientFactory apiFactory, ITeamExplorerServiceHolder holder,
-            IConnectionManager cm) : this(apiFactory, holder)
+        public TeamExplorerSectionBase(IGitHubServiceProvider serviceProvider,
+            ISimpleApiClientFactory apiFactory, ITeamExplorerServiceHolder holder,
+            IConnectionManager cm) : this(serviceProvider, apiFactory, holder)
         {
-            connectionManager = cm;
+            Guard.ArgumentNotNull(serviceProvider, nameof(serviceProvider));
+            Guard.ArgumentNotNull(apiFactory, nameof(apiFactory));
+            Guard.ArgumentNotNull(holder, nameof(holder));
+            Guard.ArgumentNotNull(cm, nameof(cm));
+
+            ConnectionManager = cm;
         }
 
         void ITeamExplorerSection.Cancel()
@@ -84,6 +99,8 @@ namespace GitHub.VisualStudio.Base
 
         void ITeamExplorerSection.Initialize(object sender, SectionInitializeEventArgs e)
         {
+            Guard.ArgumentNotNull(e, nameof(e));
+
             Initialize(e.ServiceProvider);
         }
 
@@ -101,7 +118,9 @@ namespace GitHub.VisualStudio.Base
 
         protected ITeamExplorerSection GetSection(Guid section)
         {
-            return ServiceProvider.GetService<ITeamExplorerPage>()?.GetSection(section);
+            // Return null if section hasn't been initialized yet
+            var tep = (ITeamExplorerPage)TEServiceProvider?.GetServiceSafe(typeof(ITeamExplorerPage));
+            return tep?.GetSection(section);
         }
     }
 }

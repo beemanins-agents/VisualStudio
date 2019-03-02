@@ -2,24 +2,21 @@
 using GitHub.Primitives;
 using GitHub.Services;
 using GitHub.VisualStudio.Helpers;
-using NullGuard;
 
 namespace GitHub.VisualStudio.Base
 {
     public class TeamExplorerGitRepoInfo : TeamExplorerBase, IGitAwareItem
     {
-        public TeamExplorerGitRepoInfo()
+        public TeamExplorerGitRepoInfo(IGitHubServiceProvider serviceProvider) : base(serviceProvider)
         {
             activeRepo = null;
             activeRepoUri = null;
             activeRepoName = string.Empty;
         }
 
-        ISimpleRepositoryModel activeRepo;
-        [AllowNull]
-        public ISimpleRepositoryModel ActiveRepo
+        LocalRepositoryModel activeRepo;
+        public LocalRepositoryModel ActiveRepo
         {
-            [return: AllowNull]
             get { return activeRepo; }
             set
             {
@@ -34,10 +31,9 @@ namespace GitHub.VisualStudio.Base
         /// <summary>
         /// Represents the web URL of the repository on GitHub.com, even if the origin is an SSH address.
         /// </summary>
-        [AllowNull]
         public UriString ActiveRepoUri
         {
-            [return: AllowNull] get { return activeRepoUri; }
+            get { return activeRepoUri; }
             set { activeRepoUri = value; this.RaisePropertyChange(); }
         }
 

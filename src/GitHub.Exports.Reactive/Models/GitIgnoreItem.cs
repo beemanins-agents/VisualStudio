@@ -1,4 +1,6 @@
-﻿using System;
+﻿using GitHub.Collections;
+using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
 using System.Linq;
@@ -6,7 +8,7 @@ using System.Linq;
 namespace GitHub.Models
 {
     [DebuggerDisplay("{DebuggerDisplay,nq}")]
-    public sealed class GitIgnoreItem
+    public sealed class GitIgnoreItem : ICopyable<GitIgnoreItem>, IEquatable<GitIgnoreItem>
     {
         static readonly string[] recommendedIgnoreFiles = { "None", "VisualStudio", "Node", "Eclipse", "C++", "Windows" };
 
@@ -24,6 +26,12 @@ namespace GitHub.Models
             Recommended = IsRecommended(name);
         }
 
+        public void CopyFrom(GitIgnoreItem other)
+        {
+            Name = other.Name;
+            Recommended = other.Recommended;
+        }
+
         public string Name { get; private set; }
 
         public bool Recommended { get; private set; }
@@ -32,6 +40,16 @@ namespace GitHub.Models
         {
             return recommendedIgnoreFiles.Any(item => item.Equals(name, StringComparison.OrdinalIgnoreCase));
         }
+
+        bool IEquatable<GitIgnoreItem>.Equals(GitIgnoreItem other) => Name == other.Name;
+
+        public override bool Equals(object obj)
+        {
+            var item = obj as GitIgnoreItem;
+            return item != null && Name == item.Name;
+        }
+
+        public override int GetHashCode() => 539060726 + EqualityComparer<string>.Default.GetHashCode(Name);
 
         internal string DebuggerDisplay
         {

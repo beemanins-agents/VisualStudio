@@ -1,20 +1,26 @@
 ﻿using System;
 using System.ComponentModel.Composition;
+using System.Globalization;
+using System.Reactive.Linq;
+using System.Threading.Tasks;
+using System.Windows;
+using GitHub.Api;
+using GitHub.Extensions;
+using GitHub.Factories;
+using GitHub.Info;
+using GitHub.Models;
+using GitHub.Primitives;
+using GitHub.Services;
 using GitHub.UI;
+using GitHub.ViewModels;
+using GitHub.ViewModels.TeamExplorer;
 using GitHub.VisualStudio.Base;
 using GitHub.VisualStudio.Helpers;
+using GitHub.VisualStudio.UI;
 using GitHub.VisualStudio.UI.Views;
 using Microsoft.TeamFoundation.Controls;
-using GitHub.Models;
-using GitHub.Services;
-using GitHub.Info;
+using Microsoft.VisualStudio;
 using ReactiveUI;
-using System.Reactive.Linq;
-using GitHub.Extensions;
-using GitHub.Api;
-using GitHub.VisualStudio.TeamExplorer;
-using System.Windows.Controls;
-using GitHub.VisualStudio.UI;
 
 namespace GitHub.VisualStudio.TeamExplorer.Sync
 {
@@ -25,19 +31,19 @@ namespace GitHub.VisualStudio.TeamExplorer.Sync
         public const string GitHubPublishSectionId = "92655B52-360D-4BF5-95C5-D9E9E596AC76";
 
         readonly Lazy<IVisualStudioBrowser> lazyBrowser;
-        readonly IRepositoryHosts hosts;
-        IDisposable disposable;
+        readonly IDialogService dialogService;
         bool loggedIn;
 
         [ImportingConstructor]
-        public GitHubPublishSection(ISimpleApiClientFactory apiFactory, ITeamExplorerServiceHolder holder,
+        public GitHubPublishSection(IGitHubServiceProvider serviceProvider,
+            ISimpleApiClientFactory apiFactory, ITeamExplorerServiceHolder holder,
             IConnectionManager cm, Lazy<IVisualStudioBrowser> browser,
-            IRepositoryHosts hosts)
-            : base(apiFactory, holder, cm)
+            IDialogService dialogService)
+            : base(serviceProvider, apiFactory, holder, cm)
         {
 
             lazyBrowser = browser;
-            this.hosts = hosts;
+            this.dialogService = dialogService;
             Title = Resources.GitHubPublishSectionTitle;
             Name = "GitHub";
             Provider = "GitHub, Inc";
@@ -47,6 +53,11 @@ namespace GitHub.VisualStudio.TeamExplorer.Sync
             ShowGetStarted = false;
             IsVisible = false;
             IsExpanded = true;
+            InitializeSectionView();
+        }
+
+        void InitializeSectionView()
+        {
             var view = new GitHubInvitationContent();
             SectionContent = view;
             view.DataContext = this;
@@ -58,7 +69,7 @@ namespace GitHub.VisualStudio.TeamExplorer.Sync
             {
                 IsVisible = true;
                 ShowGetStarted = true;
-                loggedIn = await connectionManager.IsLoggedIn(hosts);
+                loggedIn = await ConnectionManager.IsLoggedIn();
                 ShowLogin = !loggedIn;
                 ShowSignup = !loggedIn;
             }
@@ -72,19 +83,20 @@ namespace GitHub.VisualStudio.TeamExplorer.Sync
             Setup();
         }
 
-        protected override void RepoChanged(bool changed)
+        protected override void RepoChanged()
         {
-            base.RepoChanged(changed);
+            base.RepoChanged();
             Setup();
+            InitializeSectionView();
         }
 
-        public async void Connect()
+        public async Task Connect()
         {
-            loggedIn = await connectionManager.IsLoggedIn(hosts);
+            loggedIn = await ConnectionManager.IsLoggedIn();
             if (loggedIn)
                 ShowPublish();
             else
-                Login();
+                await Login();
         }
 
         public void SignUp()
@@ -92,51 +104,81 @@ namespace GitHub.VisualStudio.TeamExplorer.Sync
             OpenInBrowser(lazyBrowser, GitHubUrls.Plans);
         }
 
-        public void Login()
+        public void ShowPublish()
         {
-            StartFlow(UIControllerFlow.Authentication);
-        }
-
-        void StartFlow(UIControllerFlow controllerFlow)
-        {
-            var uiProvider = ServiceProvider.GetExportedValue<IUIProvider>();
-            var ret = uiProvider.SetupUI(controllerFlow, null);
-            ret.Subscribe((c) => { }, async () =>
-            {
-                loggedIn = await connectionManager.IsLoggedIn(hosts);
-                if (loggedIn)
-                    ShowPublish();
-            });
-            uiProvider.RunUI();
-        }
-
-        void ShowPublish()
-        {
-            IsBusy = true;
-            var uiProvider = ServiceProvider.GetExportedValue<IUIProvider>();
-            var factory = uiProvider.GetService<IExportFactoryProvider>();
-            var uiflow = factory.UIControllerFactory.CreateExport();
-            disposable = uiflow;
-            var ui = uiflow.Value;
-            var creation = ui.SelectFlow(UIControllerFlow.Publish);
-            bool success = false;
-            ui.ListenToCompletionState().Subscribe(s => success = s);
-
-            creation.Subscribe(data =>
-            {
-                var c = data.View;
-                SectionContent = c;
-                ((UserControl)c).DataContext = this;
-                c.IsBusy.Subscribe(x => IsBusy = x);
-            },
-            () =>
-            {
-                // there's no real cancel button in the publish form, but if support a back button there, then we want to hide the form
-                IsVisible = false;
-                if (success)
+            var factory = ServiceProvider.GetService<IViewViewModelFactory>();
+            var viewModel = ServiceProvider.GetService<IRepositoryPublishViewModel>();
+            var busy = viewModel.WhenAnyValue(x => x.IsBusy).Subscribe(x => IsBusy = x);
+            var completed = viewModel.PublishRepository
+                .Where(x => x == ProgressState.Success)
+                .Subscribe(_ =>
+                {
                     ServiceProvider.TryGetService<ITeamExplorer>()?.NavigateToPage(new Guid(TeamExplorerPageIds.Home), null);
-            });
-            ui.Start(null);
+                    HandleCreatedRepo(ActiveRepo);
+                });
+
+            var view = factory.CreateView<IRepositoryPublishViewModel>();
+            view.DataContext = viewModel;
+            SectionContent = view;
+
+            Observable.FromEventPattern<RoutedEventHandler, RoutedEventArgs>(
+                x => view.Unloaded += x,
+                x => view.Unloaded -= x)
+                .Take(1)
+                .Subscribe(_ =>
+                {
+                    busy.Dispose();
+                    completed.Dispose();
+                });
+        }
+
+        void HandleCreatedRepo(LocalRepositoryModel newrepo)
+        {
+            var msg = String.Format(CultureInfo.CurrentCulture, Constants.Notification_RepoCreated, newrepo.Name, newrepo.CloneUrl);
+            msg += " " + String.Format(CultureInfo.CurrentCulture, Constants.Notification_CreateNewProject, newrepo.LocalPath);
+            ShowNotification(newrepo, msg);
+        }
+
+        private void ShowNotification(LocalRepositoryModel newrepo, string msg)
+        {
+            var teServices = ServiceProvider.TryGetService<ITeamExplorerServices>();
+
+            teServices.ClearNotifications();
+            teServices.ShowMessage(
+                msg,
+                new RelayCommand(o =>
+                {
+                    var str = o.ToString();
+                    /* the prefix is the action to perform:
+                     * u: launch browser with url
+                     * c: launch create new project dialog
+                     * o: launch open existing project dialog 
+                    */
+                    var prefix = str.Substring(0, 2);
+                    if (prefix == "u:")
+                        OpenInBrowser(ServiceProvider.TryGetService<IVisualStudioBrowser>(), new Uri(str.Substring(2)));
+                    else if (prefix == "o:")
+                    {
+                        if (ErrorHandler.Succeeded(ServiceProvider.GetSolution().OpenSolutionViaDlg(str.Substring(2), 1)))
+                            ServiceProvider.TryGetService<ITeamExplorer>()?.NavigateToPage(new Guid(TeamExplorerPageIds.Home), null);
+                    }
+                    else if (prefix == "c:")
+                    {
+                        var vsGitServices = ServiceProvider.TryGetService<IVSGitServices>();
+                        vsGitServices.SetDefaultProjectPath(newrepo.LocalPath);
+                        if (ErrorHandler.Succeeded(ServiceProvider.GetSolution().CreateNewProjectViaDlg(null, null, 0)))
+                            ServiceProvider.TryGetService<ITeamExplorer>()?.NavigateToPage(new Guid(TeamExplorerPageIds.Home), null);
+                    }
+                })
+            );
+        }
+
+        async Task Login()
+        {
+            await dialogService.ShowLoginDialog();
+            loggedIn = await ConnectionManager.IsLoggedIn();
+            if (loggedIn)
+                ShowPublish();
         }
 
         bool disposed;
@@ -147,7 +189,6 @@ namespace GitHub.VisualStudio.TeamExplorer.Sync
                 if (!disposed)
                 {
                     disposed = true;
-                    disposable?.Dispose();
                 }
             }
             base.Dispose(disposing);

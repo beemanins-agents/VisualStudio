@@ -2,101 +2,166 @@
 using System.Collections.Specialized;
 using System.ComponentModel;
 using System.Globalization;
+using System.IO;
 using System.Linq;
 using System.Reactive.Linq;
+using System.Threading.Tasks;
+using System.Windows.Input;
 using GitHub.Api;
 using GitHub.Extensions;
+using GitHub.Logging;
 using GitHub.Models;
+using GitHub.Primitives;
 using GitHub.Services;
-using GitHub.UI;
+using GitHub.Settings;
 using GitHub.VisualStudio.Base;
 using GitHub.VisualStudio.Helpers;
+using GitHub.VisualStudio.UI;
 using GitHub.VisualStudio.UI.Views;
 using Microsoft.TeamFoundation.Controls;
 using Microsoft.VisualStudio;
-using NullGuard;
 using ReactiveUI;
-using System.Threading.Tasks;
-using GitHub.VisualStudio.UI;
-using GitHub.Primitives;
+using Serilog;
 
 namespace GitHub.VisualStudio.TeamExplorer.Connect
 {
     public class GitHubConnectSection : TeamExplorerSectionBase, IGitHubConnectSection
     {
+        static readonly ILogger log = LogManager.ForContext<GitHubConnectSection>();
+        readonly ISimpleApiClientFactory apiFactory;
+        readonly ITeamExplorerServiceHolder holder;
+        readonly IPackageSettings packageSettings;
+        readonly ITeamExplorerServices teamExplorerServices;
         readonly int sectionIndex;
+        readonly ILocalRepositories localRepositories;
+        readonly IUsageTracker usageTracker;
+
+        ITeamExplorerSection invitationSection;
+        string errorMessage;
         bool isCloning;
         bool isCreating;
+        GitHubConnectSectionState settings;
+
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Performance", "CA1823:AvoidUnusedPrivateFields")]
         SectionStateTracker sectionTracker;
 
         protected GitHubConnectContent View
         {
             get { return SectionContent as GitHubConnectContent; }
-            set { SectionContent = value; }
+            private set { SectionContent = value; }
         }
 
-        [AllowNull]
-        public IConnection SectionConnection { [return:AllowNull] get; set; }
-
-        bool loggedIn;
-        bool LoggedIn
+        public string ErrorMessage
         {
-            get { return loggedIn; }
-            set {
-                loggedIn = ShowLogout = value;
-                ShowLogin = !value;
-            }
+            get { return errorMessage; }
+            private set { errorMessage = value; this.RaisePropertyChange(); }
+        }
+
+        public IConnection SectionConnection { get; set; }
+
+        bool isLoggingIn;
+        public bool IsLoggingIn
+        {
+            get { return isLoggingIn; }
+            private set { isLoggingIn = value; this.RaisePropertyChange(); }
         }
 
         bool showLogin;
         public bool ShowLogin
         {
             get { return showLogin; }
-            set { showLogin = value; this.RaisePropertyChange(); }
+            private set { showLogin = value; this.RaisePropertyChange(); }
         }
 
         bool showLogout;
         public bool ShowLogout
         {
             get { return showLogout; }
-            set { showLogout = value; this.RaisePropertyChange(); }
+            private set { showLogout = value; this.RaisePropertyChange(); }
         }
 
-        IReactiveDerivedList<ISimpleRepositoryModel> repositories;
-        [AllowNull]
-        public IReactiveDerivedList<ISimpleRepositoryModel> Repositories
+        bool showRetry;
+        public bool ShowRetry
         {
-            [return:AllowNull]
+            get { return showRetry; }
+            private set { showRetry = value; this.RaisePropertyChange(); }
+        }
+
+        IReactiveDerivedList<LocalRepositoryModel> repositories;
+        public IReactiveDerivedList<LocalRepositoryModel> Repositories
+        {
             get { return repositories; }
-            set { repositories = value; this.RaisePropertyChange(); }
+            private set { repositories = value; this.RaisePropertyChange(); }
         }
 
-        ISimpleRepositoryModel selectedRepository;
-        [AllowNull]
-        public ISimpleRepositoryModel SelectedRepository
+        LocalRepositoryModel selectedRepository;
+        public LocalRepositoryModel SelectedRepository
         {
-            [return: AllowNull]
             get { return selectedRepository; }
             set { selectedRepository = value; this.RaisePropertyChange(); }
         }
 
-        internal ITeamExplorerServiceHolder Holder => holder;
+        public ICommand Clone { get; }
 
-        public GitHubConnectSection(ISimpleApiClientFactory apiFactory, ITeamExplorerServiceHolder holder, IConnectionManager manager, int index)
-            : base(apiFactory, holder, manager)
+        public GitHubConnectSection(IGitHubServiceProvider serviceProvider,
+            ISimpleApiClientFactory apiFactory,
+            ITeamExplorerServiceHolder holder,
+            IConnectionManager manager,
+            IPackageSettings packageSettings,
+            ITeamExplorerServices teamExplorerServices,
+            ILocalRepositories localRepositories,
+            IUsageTracker usageTracker,
+            int index)
+            : base(serviceProvider, apiFactory, holder, manager)
         {
+            Guard.ArgumentNotNull(apiFactory, nameof(apiFactory));
+            Guard.ArgumentNotNull(holder, nameof(holder));
+            Guard.ArgumentNotNull(manager, nameof(manager));
+            Guard.ArgumentNotNull(packageSettings, nameof(packageSettings));
+            Guard.ArgumentNotNull(teamExplorerServices, nameof(teamExplorerServices));
+            Guard.ArgumentNotNull(localRepositories, nameof(localRepositories));
+            Guard.ArgumentNotNull(usageTracker, nameof(usageTracker));
+
             Title = "GitHub";
             IsEnabled = true;
             IsVisible = false;
-            IsExpanded = true;
-            LoggedIn = false;
-
             sectionIndex = index;
 
-            connectionManager.Connections.CollectionChanged += RefreshConnections;
+            this.apiFactory = apiFactory;
+            this.holder = holder;
+            this.packageSettings = packageSettings;
+            this.teamExplorerServices = teamExplorerServices;
+            this.localRepositories = localRepositories;
+            this.usageTracker = usageTracker;
+
+            Clone = ReactiveCommand.CreateFromTask(DoClone);
+
+            ConnectionManager.Connections.CollectionChanged += RefreshConnections;
             PropertyChanged += OnPropertyChange;
             UpdateConnection();
+        }
+
+        async Task DoClone()
+        {
+            var dialogService = ServiceProvider.GetService<IDialogService>();
+            var result = await dialogService.ShowCloneDialog(SectionConnection);
+
+            if (result != null)
+            {
+                try
+                {
+                    ServiceProvider.GitServiceProvider = TEServiceProvider;
+                    var cloneService = ServiceProvider.GetService<IRepositoryCloneService>();
+                    await cloneService.CloneOrOpenRepository(result);
+
+                    usageTracker.IncrementCounter(x => x.NumberOfGitHubConnectSectionClones).Forget();
+                }
+                catch (Exception e)
+                {
+                    var teServices = ServiceProvider.TryGetService<ITeamExplorerServices>();
+                    teServices.ShowError(e.GetUserFriendlyErrorMessage(ErrorType.CloneOrOpenFailed, result.Url.RepositoryName));
+                }
+            }
         }
 
         void RefreshConnections(object sender, NotifyCollectionChangedEventArgs e)
@@ -104,53 +169,73 @@ namespace GitHub.VisualStudio.TeamExplorer.Connect
             switch (e.Action)
             {
                 case NotifyCollectionChangedAction.Add:
-                    if (connectionManager.Connections.Count > sectionIndex)
-                        Refresh(connectionManager.Connections[sectionIndex]);
+                    if (ConnectionManager.Connections.Count > sectionIndex)
+                        Refresh(ConnectionManager.Connections[sectionIndex]);
                     break;
                 case NotifyCollectionChangedAction.Remove:
-                    Refresh(connectionManager.Connections.Count <= sectionIndex
+                    Refresh(ConnectionManager.Connections.Count <= sectionIndex
                         ? null
-                        : connectionManager.Connections[sectionIndex]);
+                        : ConnectionManager.Connections[sectionIndex]);
                     break;
             }
         }
 
         protected void Refresh(IConnection connection)
         {
-            if (connection == null)
+            InitializeInvitationSection();
+
+            ErrorMessage = connection?.ConnectionError?.GetUserFriendlyErrorMessage(ErrorType.LoginFailed);
+            IsLoggingIn = connection?.IsLoggingIn ?? false;
+            IsVisible = connection != null || (invitationSection?.IsVisible == false);
+
+            if (connection == null || !connection.IsLoggedIn)
             {
-                LoggedIn = false;
-                IsVisible = false;
-                SectionConnection = null;
                 if (Repositories != null)
                     Repositories.CollectionChanged -= UpdateRepositoryList;
                 Repositories = null;
+                settings = null;
 
-                if (sectionIndex == 0 && ServiceProvider != null)
+                if (connection?.ConnectionError != null)
                 {
-                    var section = GetSection(TeamExplorerInvitationBase.TeamExplorerInvitationSectionGuid);
-                    IsVisible = !(section?.IsVisible ?? true); // only show this when the invitation section is hidden. When in doubt, don't show it.
-                    if (section != null)
-                        section.PropertyChanged += (s, p) =>
-                        {
-                            if (p.PropertyName == "IsVisible")
-                                IsVisible = LoggedIn || !((ITeamExplorerSection)s).IsVisible;
-                        };
+                    ShowLogin = false;
+                    ShowLogout = true;
+                    ShowRetry = !(connection.ConnectionError is Octokit.AuthorizationException);
+                }
+                else
+                {
+                    ShowLogin = true;
+                    ShowLogout = false;
+                    ShowRetry = false;
                 }
             }
-            else
+            else if (connection != SectionConnection || Repositories == null)
             {
-                if (connection != SectionConnection)
+                Repositories?.Dispose();
+                Repositories = localRepositories.GetRepositoriesForAddress(connection.HostAddress);
+                Repositories.CollectionChanged += UpdateRepositoryList;
+                settings = packageSettings.UIState.GetOrCreateConnectSection(Title);
+                ShowLogin = false;
+                ShowLogout = true;
+                Title = connection.HostAddress.Title;
+            }
+
+            if (connection != null && TEServiceProvider != null)
+            {
+                RefreshRepositories().Forget();
+            }
+
+            if (SectionConnection != connection)
+            {
+                if (SectionConnection != null)
                 {
-                    SectionConnection = connection;
-                    Repositories = SectionConnection.Repositories.CreateDerivedCollection(x => x,
-                                        orderer: OrderedComparer<ISimpleRepositoryModel>.OrderBy(x => x.Name).Compare);
-                    Repositories.CollectionChanged += UpdateRepositoryList;
-                    Title = connection.HostAddress.Title;
-                    IsVisible = true;
-                    LoggedIn = true;
-                    if (ServiceProvider != null)
-                        RefreshRepositories().Forget();
+                    SectionConnection.PropertyChanged -= ConnectionPropertyChanged;
+                }
+
+                SectionConnection = connection;
+
+                if (SectionConnection != null)
+                {
+                    SectionConnection.PropertyChanged += ConnectionPropertyChanged;
                 }
             }
         }
@@ -163,6 +248,8 @@ namespace GitHub.VisualStudio.TeamExplorer.Connect
 
         public override void Initialize(IServiceProvider serviceProvider)
         {
+            Guard.ArgumentNotNull(serviceProvider, nameof(serviceProvider));
+
             base.Initialize(serviceProvider);
             UpdateConnection();
 
@@ -172,17 +259,51 @@ namespace GitHub.VisualStudio.TeamExplorer.Connect
                 sectionTracker = new SectionStateTracker(section, RefreshRepositories);
         }
 
+        void InitializeInvitationSection()
+        {
+            // We're only interested in the invitation section if sectionIndex == 0. Don't want to show
+            // two "Log In" options.
+            if (sectionIndex == 0 && invitationSection == null)
+            {
+                invitationSection = GetSection(TeamExplorerInvitationBase.TeamExplorerInvitationSectionGuid);
+
+                if (invitationSection != null)
+                {
+                    invitationSection.PropertyChanged += InvitationSectionPropertyChanged;
+                }
+            }
+        }
+
         void UpdateConnection()
         {
-            Refresh(connectionManager.Connections.Count > sectionIndex
-                ? connectionManager.Connections[sectionIndex]
+            Refresh(ConnectionManager.Connections.Count > sectionIndex
+                ? ConnectionManager.Connections[sectionIndex]
                 : SectionConnection);
         }
 
         void OnPropertyChange(object sender, PropertyChangedEventArgs e)
         {
-            if (e.PropertyName == "IsVisible" && IsVisible && View == null)
+            if (e.PropertyName == nameof(IsVisible) && IsVisible && View == null)
                 View = new GitHubConnectContent { DataContext = this };
+            else if (e.PropertyName == nameof(IsExpanded) && settings != null)
+                settings.IsExpanded = IsExpanded;
+        }
+
+        void InvitationSectionPropertyChanged(object sender, PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName == nameof(ITeamExplorerSection.IsVisible))
+            {
+                Refresh(SectionConnection);
+            }
+        }
+
+        private void ConnectionPropertyChanged(object sender, PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName == nameof(IConnection.IsLoggedIn) ||
+                e.PropertyName == nameof(IConnection.IsLoggingIn))
+            {
+                Refresh(SectionConnection);
+            }
         }
 
         async void UpdateRepositoryList(object sender, NotifyCollectionChangedEventArgs e)
@@ -193,7 +314,7 @@ namespace GitHub.VisualStudio.TeamExplorer.Connect
                 // so we can handle just one new entry separately
                 if (isCloning || isCreating)
                 {
-                    var newrepo = e.NewItems.Cast<ISimpleRepositoryModel>().First();
+                    var newrepo = e.NewItems.Cast<LocalRepositoryModel>().First();
 
                     SelectedRepository = newrepo;
                     if (isCreating)
@@ -202,46 +323,78 @@ namespace GitHub.VisualStudio.TeamExplorer.Connect
                         HandleClonedRepo(newrepo);
 
                     isCreating = isCloning = false;
-                    var repo = await ApiFactory.Create(newrepo.CloneUrl).GetRepository();
-                    newrepo.SetIcon(repo.Private, repo.Fork);
+
+                    try
+                    {
+                        // TODO: Cache the icon state.
+                        var api = await apiFactory.Create(newrepo.CloneUrl);
+                        var repo = await api.GetRepository();
+                        newrepo.SetIcon(repo.Private, repo.Fork);
+                    }
+                    catch (Exception ex)
+                    {
+                        // GetRepository() may throw if the user doesn't have permissions to access the repo
+                        // (because the repo no longer exists, or because the user has logged in on a different
+                        // profile, or their permissions have changed remotely)
+                        log.Error(ex, "Error updating repository list");
+                    }
                 }
                 // looks like it's just a refresh with new stuff on the list, update the icons
                 else
                 {
                     e.NewItems
-                        .Cast<ISimpleRepositoryModel>()
+                        .Cast<LocalRepositoryModel>()
                         .ForEach(async r =>
                     {
-                        if (Equals(Holder.ActiveRepo, r))
+                        if (Equals(holder.TeamExplorerContext.ActiveRepository, r))
                             SelectedRepository = r;
-                        var repo = await ApiFactory.Create(r.CloneUrl).GetRepository();
-                        r.SetIcon(repo.Private, repo.Fork);
+
+                        try
+                        {
+                            // TODO: Cache the icon state.
+                            var api = await apiFactory.Create(r.CloneUrl);
+                            var repo = await api.GetRepository();
+                            r.SetIcon(repo.Private, repo.Fork);
+                        }
+                        catch (Exception ex)
+                        {
+                            // GetRepository() may throw if the user doesn't have permissions to access the repo
+                            // (because the repo no longer exists, or because the user has logged in on a different
+                            // profile, or their permissions have changed remotely)
+                            log.Error(ex, "Error updating repository list");
+                        }
                     });
                 }
             }
         }
 
-        void HandleCreatedRepo(ISimpleRepositoryModel newrepo)
+        void HandleCreatedRepo(LocalRepositoryModel newrepo)
         {
-            var msg = string.Format(CultureInfo.CurrentUICulture, Constants.Notification_RepoCreated, newrepo.Name, newrepo.CloneUrl);
-            msg += " " + string.Format(CultureInfo.CurrentUICulture, Constants.Notification_CreateNewProject, newrepo.LocalPath);
+            Guard.ArgumentNotNull(newrepo, nameof(newrepo));
+
+            var msg = string.Format(CultureInfo.CurrentCulture, Constants.Notification_RepoCreated, newrepo.Name, newrepo.CloneUrl);
+            msg += " " + string.Format(CultureInfo.CurrentCulture, Constants.Notification_CreateNewProject, newrepo.LocalPath);
             ShowNotification(newrepo, msg);
         }
 
-        void HandleClonedRepo(ISimpleRepositoryModel newrepo)
+        void HandleClonedRepo(LocalRepositoryModel newrepo)
         {
-            var msg = string.Format(CultureInfo.CurrentUICulture, Constants.Notification_RepoCloned, newrepo.Name, newrepo.CloneUrl);
+            Guard.ArgumentNotNull(newrepo, nameof(newrepo));
+
+            var msg = string.Format(CultureInfo.CurrentCulture, Constants.Notification_RepoCloned, newrepo.Name, newrepo.CloneUrl);
             if (newrepo.HasCommits() && newrepo.MightContainSolution())
-                msg += " " + string.Format(CultureInfo.CurrentUICulture, Constants.Notification_OpenProject, newrepo.LocalPath);
+                msg += " " + string.Format(CultureInfo.CurrentCulture, Constants.Notification_OpenProject, newrepo.LocalPath);
             else
-                msg += " " + string.Format(CultureInfo.CurrentUICulture, Constants.Notification_CreateNewProject, newrepo.LocalPath);
+                msg += " " + string.Format(CultureInfo.CurrentCulture, Constants.Notification_CreateNewProject, newrepo.LocalPath);
             ShowNotification(newrepo, msg);
         }
 
-        void ShowNotification(ISimpleRepositoryModel newrepo, string msg)
+        void ShowNotification(LocalRepositoryModel newrepo, string msg)
         {
-            var teServices = ServiceProvider.GetExportedValue<ITeamExplorerServices>();
-            
+            Guard.ArgumentNotNull(newrepo, nameof(newrepo));
+
+            var teServices = ServiceProvider.TryGetService<ITeamExplorerServices>();
+
             teServices.ClearNotifications();
             teServices.ShowMessage(
                 msg,
@@ -255,7 +408,7 @@ namespace GitHub.VisualStudio.TeamExplorer.Connect
                     */
                     var prefix = str.Substring(0, 2);
                     if (prefix == "u:")
-                        OpenInBrowser(ServiceProvider.GetExportedValue<IVisualStudioBrowser>(), new Uri(str.Substring(2)));
+                        OpenInBrowser(ServiceProvider.TryGetService<IVisualStudioBrowser>(), new Uri(str.Substring(2)));
                     else if (prefix == "o:")
                     {
                         if (ErrorHandler.Succeeded(ServiceProvider.GetSolution().OpenSolutionViaDlg(str.Substring(2), 1)))
@@ -263,88 +416,79 @@ namespace GitHub.VisualStudio.TeamExplorer.Connect
                     }
                     else if (prefix == "c:")
                     {
-                        var vsservices = ServiceProvider.GetExportedValue<IVSServices>();
-                        vsservices.SetDefaultProjectPath(newrepo.LocalPath);
+                        var vsGitServices = ServiceProvider.TryGetService<IVSGitServices>();
+                        vsGitServices.SetDefaultProjectPath(newrepo.LocalPath);
                         if (ErrorHandler.Succeeded(ServiceProvider.GetSolution().CreateNewProjectViaDlg(null, null, 0)))
                             ServiceProvider.TryGetService<ITeamExplorer>()?.NavigateToPage(new Guid(TeamExplorerPageIds.Home), null);
                     }
                 })
             );
-#if DEBUG
-            VsOutputLogger.WriteLine(String.Format(CultureInfo.InvariantCulture, "{0} Notification", DateTime.Now));
-#endif
+            log.Debug("Notification");
         }
 
         async Task RefreshRepositories()
         {
-            await connectionManager.RefreshRepositories();
-            RaisePropertyChanged("Repositories"); // trigger a re-check of the visibility of the listview based on item count
+            // TODO: This is wasteful as we can be calling it multiple times for a single changed
+            // signal, once from each section. Needs refactoring.
+            await localRepositories.Refresh();
+            RaisePropertyChanged(nameof(Repositories)); // trigger a re-check of the visibility of the listview based on item count
         }
 
         public void DoCreate()
         {
-            StartFlow(UIControllerFlow.Create);
-        }
-
-        public void DoClone()
-        {
-            StartFlow(UIControllerFlow.Clone);
+            ServiceProvider.GitServiceProvider = TEServiceProvider;
+            var dialogService = ServiceProvider.GetService<IDialogService>();
+            dialogService.ShowCreateRepositoryDialog(SectionConnection);
         }
 
         public void SignOut()
         {
-            SectionConnection.Logout();
+            ConnectionManager.LogOut(SectionConnection.HostAddress);
         }
 
         public void Login()
         {
-            StartFlow(UIControllerFlow.Authentication);
+            var dialogService = ServiceProvider.GetService<IDialogService>();
+            dialogService.ShowLoginDialog();
+        }
+
+        public void Retry()
+        {
+            ConnectionManager.Retry(SectionConnection);
         }
 
         public bool OpenRepository()
         {
-            var old = Repositories.FirstOrDefault(x => x.Equals(Holder.ActiveRepo));
-            // open the solution selection dialog when the user wants to switch to a different repo
-            // since there's no other way of changing the source control context in VS
+            var old = Repositories.FirstOrDefault(x => x.Equals(holder.TeamExplorerContext.ActiveRepository));
             if (!Equals(SelectedRepository, old))
             {
-                if (ErrorHandler.Succeeded(ServiceProvider.GetSolution().OpenSolutionViaDlg(SelectedRepository.LocalPath, 1)))
+                try
                 {
-                    ServiceProvider.TryGetService<ITeamExplorer>()?.NavigateToPage(new Guid(TeamExplorerPageIds.Home), null);
-                    return true;
+                    var repositoryPath = SelectedRepository.LocalPath;
+                    if (Directory.Exists(repositoryPath))
+                    {
+                        teamExplorerServices.OpenRepository(SelectedRepository.LocalPath);
+                    }
+                    else
+                    {
+                        // If directory no longer exists, let user find solution themselves
+                        var opened = ErrorHandler.Succeeded(ServiceProvider.GetSolution().OpenSolutionViaDlg(SelectedRepository.LocalPath, 1));
+                        if (!opened)
+                        {
+                            return false;
+                        }
+                    }
                 }
-                else
+                catch (Exception e)
                 {
-                    SelectedRepository = old;
+                    log.Error(e, nameof(OpenRepository));
                     return false;
                 }
             }
-            return false;
-        }
 
-        void StartFlow(UIControllerFlow controllerFlow)
-        {
-            var notifications = ServiceProvider.GetExportedValue<INotificationDispatcher>();
-            var teServices = ServiceProvider.GetExportedValue<ITeamExplorerServices>();
-            notifications.AddListener(teServices);
-
-            var uiProvider = ServiceProvider.GetExportedValue<IUIProvider>();
-            uiProvider.GitServiceProvider = ServiceProvider;
-            uiProvider.SetupUI(controllerFlow, SectionConnection);
-            uiProvider.ListenToCompletionState()
-                .Subscribe(success =>
-                {
-                    if (success)
-                    {
-                        if (controllerFlow == UIControllerFlow.Clone)
-                            isCloning = true;
-                        else if (controllerFlow == UIControllerFlow.Create)
-                            isCreating = true;
-                    }
-                });
-            uiProvider.RunUI();
-
-            notifications.RemoveListener();
+            // Navigate away when we're on the correct source control contexts.
+            ServiceProvider.TryGetService<ITeamExplorer>()?.NavigateToPage(new Guid(TeamExplorerPageIds.Home), null);
+            return true;
         }
 
         bool disposed;
@@ -354,15 +498,43 @@ namespace GitHub.VisualStudio.TeamExplorer.Connect
             {
                 if (!disposed)
                 {
-                    connectionManager.Connections.CollectionChanged -= RefreshConnections;
+                    ConnectionManager.Connections.CollectionChanged -= RefreshConnections;
                     if (Repositories != null)
                         Repositories.CollectionChanged -= UpdateRepositoryList;
                     disposed = true;
+                    packageSettings.Save();
                 }
             }
             base.Dispose(disposing);
         }
 
+        /// <summary>
+        /// Creates a ReactiveCommand that works like a command created via
+        /// <see cref="ReactiveCommand.CreateAsyncTask"/> but that does not hang when the async
+        /// task shows a modal dialog.
+        /// </summary>
+        /// <param name="executeAsync">Method that creates the task to run.</param>
+        /// <returns>A reactive command.</returns>
+        /// <remarks>
+        /// The <see cref="Clone"/> command needs to be disabled while a clone operation is in
+        /// progress but also needs to display a modal dialog. For some reason using
+        /// <see cref="ReactiveCommand.CreateAsyncTask"/> causes a weird UI hang in this situation
+        /// where the UI runs but WhenAny no longer responds to property changed notifications.
+        /// </remarks>
+        ////static ReactiveCommand<Unit,Unit> CreateAsyncCommandHack(Func<Task> executeAsync)
+        ////{
+        ////    Guard.ArgumentNotNull(executeAsync, nameof(executeAsync));
+
+        ////    var enabled = new BehaviorSubject<bool>(true);
+        ////    var command = ReactiveCommand.Create(enabled);
+        ////    command.Subscribe(async _ =>
+        ////    {
+        ////        enabled.OnNext(false);
+        ////        try { await executeAsync(); }
+        ////        finally { enabled.OnNext(true); }
+        ////    });
+        ////    return command;
+        ////}
 
         class SectionStateTracker
         {
@@ -402,9 +574,10 @@ namespace GitHub.VisualStudio.TeamExplorer.Connect
             {
                 if (machine.PermittedTriggers.Contains(e.PropertyName))
                 {
-#if DEBUG
-                    VsOutputLogger.WriteLine(String.Format(CultureInfo.InvariantCulture, "{3} {0} title:{1} busy:{2}", e.PropertyName, ((ITeamExplorerSection)sender).Title, ((ITeamExplorerSection)sender).IsBusy, DateTime.Now));
-#endif
+                    log.Debug("{PropertyName} title:{Title} busy:{IsBusy}",
+                        e.PropertyName,
+                        ((ITeamExplorerSection)sender).Title,
+                        ((ITeamExplorerSection)sender).IsBusy);
                     machine.Fire(e.PropertyName);
                 }
             }

@@ -1,5 +1,7 @@
-﻿using System.Reflection;
+﻿using System;
+using System.Reflection;
 using System.Runtime.InteropServices;
+using System.Windows.Markup;
 
 [assembly: AssemblyTitle("GitHub.VisualStudio")]
 [assembly: AssemblyDescription("GitHub for Visual Studio VSPackage")]

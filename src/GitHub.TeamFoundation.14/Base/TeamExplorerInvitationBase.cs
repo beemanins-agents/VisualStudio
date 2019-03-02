@@ -1,7 +1,8 @@
-﻿using GitHub.VisualStudio.Helpers;
+﻿using GitHub.Services;
+using GitHub.VisualStudio.Helpers;
 using Microsoft.TeamFoundation.Controls;
-using NullGuard;
 using System;
+using GitHub.Extensions;
 
 namespace GitHub.VisualStudio.Base
 {
@@ -9,9 +10,14 @@ namespace GitHub.VisualStudio.Base
     {
         public static readonly Guid TeamExplorerInvitationSectionGuid = new Guid("8914ac06-d960-4537-8345-cb13c00378d8");
 
+        protected TeamExplorerInvitationBase(IGitHubServiceProvider serviceProvider) : base(serviceProvider)
+        {}
+
         public virtual void Initialize(IServiceProvider serviceProvider)
         {
-            ServiceProvider = serviceProvider;
+            Guard.ArgumentNotNull(serviceProvider, nameof(serviceProvider));
+
+            TEServiceProvider = serviceProvider;
         }
 
         /// <summary>
@@ -40,28 +46,22 @@ namespace GitHub.VisualStudio.Base
         }
 
         string connectLabel;
-        [AllowNull]
         public string ConnectLabel
         {
-            [return: AllowNull]
             get { return connectLabel; }
             set { connectLabel = value; this.RaisePropertyChange(); }
         }
 
         string description;
-        [AllowNull]
         public string Description
         {
-            [return: AllowNull]
             get { return description; }
             set { description = value; this.RaisePropertyChange(); }
         }
 
         object icon;
-        [AllowNull]
         public object Icon
         {
-            [return: AllowNull]
             get { return icon; }
             set { icon = value; this.RaisePropertyChange(); }
         }
@@ -74,28 +74,22 @@ namespace GitHub.VisualStudio.Base
         }
 
         string name;
-        [AllowNull]
         public string Name
         {
-            [return: AllowNull]
             get { return name; }
             set { name = value; this.RaisePropertyChange(); }
         }
 
         string provider;
-        [AllowNull]
         public string Provider
         {
-            [return: AllowNull]
             get { return provider; }
             set { provider = value; this.RaisePropertyChange(); }
         }
 
         string signUpLabel;
-        [AllowNull]
         public string SignUpLabel
         {
-            [return: AllowNull]
             get { return signUpLabel; }
             set { signUpLabel = value; this.RaisePropertyChange(); }
         }

@@ -19,9 +19,11 @@ namespace GitHub.VisualStudio.TeamExplorer.Home
         readonly Lazy<IVisualStudioBrowser> browser;
 
         [ImportingConstructor]
-        public WikiNavigationItem(ISimpleApiClientFactory apiFactory, Lazy<IVisualStudioBrowser> browser,
-                                    ITeamExplorerServiceHolder holder)
-            : base(apiFactory, holder, Octicon.book)
+        public WikiNavigationItem(IGitHubServiceProvider serviceProvider,
+            ISimpleApiClientFactory apiFactory,
+            Lazy<IVisualStudioBrowser> browser,
+            ITeamExplorerServiceHolder holder)
+            : base(serviceProvider, apiFactory, holder, Octicon.book)
         {
             this.browser = browser;
             Text = Resources.WikiNavigationItemText;
@@ -36,7 +38,7 @@ namespace GitHub.VisualStudio.TeamExplorer.Home
 
         public override async void Invalidate()
         {
-            var visible = await IsAGitHubRepo();
+            var visible = await IsAGitHubRepo(ActiveRepoUri);
             if (visible)
             {
                 var repo = await SimpleApiClient.GetRepository();

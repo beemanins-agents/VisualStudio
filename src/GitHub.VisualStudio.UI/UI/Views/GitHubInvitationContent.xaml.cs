@@ -1,7 +1,6 @@
 ﻿using System.Windows;
 using System.Windows.Controls;
 using GitHub.VisualStudio.TeamExplorer;
-using NullGuard;
 
 namespace GitHub.VisualStudio.UI.Views
 {
@@ -17,10 +16,8 @@ namespace GitHub.VisualStudio.UI.Views
             DataContextChanged += (s, e) => ViewModel = e.NewValue as IGitHubInvitationSection;
         }
 
-        [AllowNull]
         public IGitHubInvitationSection ViewModel
         {
-            [return: AllowNull]
             get { return GetValue(ViewModelProperty) as IGitHubInvitationSection; }
             set { SetValue(ViewModelProperty, value); }
         }
@@ -39,11 +36,6 @@ namespace GitHub.VisualStudio.UI.Views
         void signup_Click(object sender, RoutedEventArgs e)
         {
             ViewModel.SignUp();
-        }
-
-        void login_Click(object sender, RoutedEventArgs e)
-        {
-            ViewModel.Login();
         }
     }
 }

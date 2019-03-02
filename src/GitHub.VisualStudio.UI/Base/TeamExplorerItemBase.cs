@@ -6,21 +6,22 @@ using GitHub.Models;
 using GitHub.Primitives;
 using GitHub.Services;
 using GitHub.VisualStudio.Helpers;
-using NullGuard;
 using GitHub.ViewModels;
+using GitHub.VisualStudio.UI;
+using GitHub.Extensions;
+using System.ComponentModel;
 
 namespace GitHub.VisualStudio.Base
 {
     public class TeamExplorerItemBase : TeamExplorerGitRepoInfo, IServiceProviderAware
     {
+        readonly ITeamExplorerServiceHolder holder;
         readonly ISimpleApiClientFactory apiFactory;
-        protected ITeamExplorerServiceHolder holder;
 
         ISimpleApiClient simpleApiClient;
-        [AllowNull]
         public ISimpleApiClient SimpleApiClient
         {
-            [return: AllowNull] get { return simpleApiClient; }
+            get { return simpleApiClient; }
             set
             {
                 if (simpleApiClient != value && value == null)
@@ -29,35 +30,33 @@ namespace GitHub.VisualStudio.Base
             }
         }
 
-        protected ISimpleApiClientFactory ApiFactory => apiFactory;
-
-        public TeamExplorerItemBase(ITeamExplorerServiceHolder holder)
+        public TeamExplorerItemBase(IGitHubServiceProvider serviceProvider, ISimpleApiClientFactory apiFactory,
+            ITeamExplorerServiceHolder holder) : this(serviceProvider, holder)
         {
-            this.holder = holder;
+            Guard.ArgumentNotNull(apiFactory, nameof(apiFactory));
+
+            this.apiFactory = apiFactory;
         }
 
-        public TeamExplorerItemBase(ISimpleApiClientFactory apiFactory, ITeamExplorerServiceHolder holder)
+        public TeamExplorerItemBase(IGitHubServiceProvider serviceProvider, ITeamExplorerServiceHolder holder)
+            : base(serviceProvider)
         {
-            this.apiFactory = apiFactory;
+            Guard.ArgumentNotNull(holder, nameof(holder));
+
             this.holder = holder;
         }
 
         public virtual void Initialize(IServiceProvider serviceProvider)
         {
-#if DEBUG
-            //VsOutputLogger.WriteLine("{0:HHmmssff}\t{1} Initialize", DateTime.Now, GetType());
-#endif
-            ServiceProvider = serviceProvider;
+            Guard.ArgumentNotNull(serviceProvider, nameof(serviceProvider));
+
+            TEServiceProvider = serviceProvider;
             Debug.Assert(holder != null, "Could not get an instance of TeamExplorerServiceHolder");
             if (holder == null)
                 return;
-            holder.ServiceProvider = ServiceProvider;
+            holder.ServiceProvider = TEServiceProvider;
             SubscribeToRepoChanges();
-#if DEBUG
-            //VsOutputLogger.WriteLine("{0:HHmmssff}\t{1} Initialize DONE", DateTime.Now, GetType());
-#endif
         }
-
 
         public virtual void Execute()
         {
@@ -67,24 +66,50 @@ namespace GitHub.VisualStudio.Base
         {
         }
 
-        void SubscribeToRepoChanges()
+        bool subscribedToRepoChanges = false;
+        protected void SubscribeToRepoChanges()
         {
-            holder.Subscribe(this, (ISimpleRepositoryModel repo) =>
+            if (!subscribedToRepoChanges)
             {
-                var changed = ActiveRepo != repo;
-                ActiveRepo = repo;
-                RepoChanged(changed);
-            });
+                subscribedToRepoChanges = true;
+                UpdateRepoOnMainThread(holder.TeamExplorerContext.ActiveRepository);
+                holder.TeamExplorerContext.PropertyChanged += TeamExplorerContext_PropertyChanged;
+            }
+        }
+
+        void TeamExplorerContext_PropertyChanged(object sender, PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName == nameof(holder.TeamExplorerContext.ActiveRepository))
+            {
+                UpdateRepoOnMainThread(holder.TeamExplorerContext.ActiveRepository);
+            }
+        }
+
+        void UpdateRepoOnMainThread(LocalRepositoryModel repo)
+        {
+            holder.JoinableTaskFactory.RunAsync(async () =>
+            {
+                await holder.JoinableTaskFactory.SwitchToMainThreadAsync();
+                UpdateRepo(repo);
+            }).Task.Forget();
         }
 
         void Unsubscribe()
         {
-            holder.Unsubscribe(this);
-            if (ServiceProvider != null)
-                holder.ClearServiceProvider(ServiceProvider);
+            holder.TeamExplorerContext.PropertyChanged -= TeamExplorerContext_PropertyChanged;
+
+            if (TEServiceProvider != null)
+                holder.ClearServiceProvider(TEServiceProvider);
         }
 
-        protected virtual void RepoChanged(bool changed)
+        void UpdateRepo(LocalRepositoryModel repo)
+        {
+            ActiveRepo = repo;
+            RepoChanged();
+            Invalidate();
+        }
+
+        protected virtual void RepoChanged()
         {
             var repo = ActiveRepo;
             if (repo != null)
@@ -98,22 +123,60 @@ namespace GitHub.VisualStudio.Base
             }
         }
 
-        protected async Task<bool> IsAGitHubRepo()
+        protected async Task<RepositoryOrigin> GetRepositoryOrigin(UriString uri)
         {
-            var uri = ActiveRepoUri;
             if (uri == null)
-                return false;
+                return RepositoryOrigin.Other;
 
             Debug.Assert(apiFactory != null, "apiFactory cannot be null. Did you call the right constructor?");
-            SimpleApiClient = apiFactory.Create(uri);
+            SimpleApiClient = await apiFactory.Create(uri);
 
             var isdotcom = HostAddress.IsGitHubDotComUri(uri.ToRepositoryUrl());
-            if (!isdotcom)
+
+            if (isdotcom)
+            {
+                return RepositoryOrigin.DotCom;
+            }
+            else
             {
                 var repo = await SimpleApiClient.GetRepository();
-                return (repo.FullName == ActiveRepoName || repo.Id == 0) && SimpleApiClient.IsEnterprise();
+
+                if ((repo.FullName == ActiveRepoName || repo.Id == 0) && await SimpleApiClient.IsEnterprise())
+                {
+                    return RepositoryOrigin.Enterprise;
+                }
             }
-            return isdotcom;
+
+            return RepositoryOrigin.Other;
+        }
+
+        protected async Task<bool> IsAGitHubRepo(UriString uri)
+        {
+            var origin = await GetRepositoryOrigin(uri);
+            return origin == RepositoryOrigin.DotCom || origin == RepositoryOrigin.Enterprise;
+        }
+
+        protected async Task<bool> IsAGitHubDotComRepo(UriString uri)
+        {
+            var origin = await GetRepositoryOrigin(uri);
+            return origin == RepositoryOrigin.DotCom;
+        }
+
+        protected async Task<bool> IsUserAuthenticated()
+        {
+            if (SimpleApiClient == null)
+            {
+                if (ActiveRepo == null)
+                    return false;
+
+                var uri = ActiveRepoUri;
+                if (uri == null)
+                    return false;
+
+                SimpleApiClient = await apiFactory.Create(uri);
+            }
+
+            return SimpleApiClient?.IsAuthenticated() ?? false;
         }
 
         bool disposed;
@@ -145,12 +208,10 @@ namespace GitHub.VisualStudio.Base
         }
 
         string text;
-        [AllowNull]
         public string Text
         {
             get { return text; }
             set { text = value; this.RaisePropertyChange(); }
         }
-
     }
 }

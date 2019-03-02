@@ -1,13 +1,15 @@
+using System;
 using System.Reflection;
 using System.Resources;
 using System.Runtime.InteropServices;
 
 [assembly: AssemblyProduct("GitHub Extension for Visual Studio")]
-[assembly: AssemblyVersion("1.0.18.3")]
-[assembly: AssemblyFileVersion("1.0.18.3")]
+[assembly: AssemblyVersion(AssemblyVersionInformation.Version)]
+[assembly: AssemblyFileVersion(AssemblyVersionInformation.Version)]
+[assembly: AssemblyInformationalVersion(AssemblyVersionInformation.Version)]
 [assembly: ComVisible(false)]
 [assembly: AssemblyCompany("GitHub, Inc.")]
-[assembly: AssemblyCopyright("Copyright © GitHub, Inc. 2014-2015")]
+[assembly: AssemblyCopyright("Copyright © GitHub, Inc. 2014-2016")]
 [assembly: AssemblyConfiguration("")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]
@@ -16,6 +18,6 @@ using System.Runtime.InteropServices;
 namespace System
 {
     internal static class AssemblyVersionInformation {
-        internal const string Version = "1.0.18.3";
+        internal const string Version = "2.9.0.0";
     }
 }

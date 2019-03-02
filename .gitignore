@@ -20,6 +20,7 @@ build/
 
 # Roslyn cache directories
 *.ide/
+.vs/
 
 # MSTest test Results
 [Tt]est[Rr]esult*/
@@ -98,7 +99,6 @@ _TeamCity*
 # NCrunch
 _NCrunch_*
 .*crunch*.local.xml
-*.ncrunch*
 
 # MightyMoose
 *.mm.*
@@ -232,10 +232,14 @@ $RECYCLE.BIN/
 *.msm
 *.msp
 
+#OpenCover output
+coverage.xml
+
+#Msbuild binary log output
+output.binlog
+
 AkavacheSqliteLinkerOverride.cs
 NuGetBuild
 WiX.Toolset.DummyFile.txt
-nunit-UnitTests.xml
-nunit-TrackingCollectionTests.xml
+nunit-*.xml
 GitHubVS.sln.DotSettings
-**/generated/*.cs

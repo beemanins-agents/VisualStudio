@@ -11,6 +11,7 @@ using System.ComponentModel.Composition;
 using System.Windows;
 using System.Windows.Media;
 using GitHub.VisualStudio.UI;
+using System.Linq;
 
 namespace GitHub.VisualStudio.TeamExplorer.Connect
 {
@@ -20,11 +21,18 @@ namespace GitHub.VisualStudio.TeamExplorer.Connect
     {
         public const string GitHubInvitationSectionId = "C2443FCC-6D62-4D31-B08A-C4DE70109C7F";
         public const int GitHubInvitationSectionPriority = 100;
+        readonly IDialogService dialogService;
         readonly Lazy<IVisualStudioBrowser> lazyBrowser;
 
         [ImportingConstructor]
-        public GitHubInvitationSection(IConnectionManager cm, Lazy<IVisualStudioBrowser> browser)
+        public GitHubInvitationSection(
+            IGitHubServiceProvider serviceProvider,
+            IDialogService dialogService,
+            IConnectionManager cm,
+            Lazy<IVisualStudioBrowser> browser)
+            : base(serviceProvider)
         {
+            this.dialogService = dialogService;
             lazyBrowser = browser;
             CanConnect = true;
             CanSignUp = true;
@@ -46,19 +54,12 @@ namespace GitHub.VisualStudio.TeamExplorer.Connect
 
         public override void Connect()
         {
-            StartFlow(UIControllerFlow.Authentication);
-            base.Connect();
+            dialogService.ShowLoginDialog();
         }
 
         public override void SignUp()
         {
             OpenInBrowser(lazyBrowser, GitHubUrls.Plans);
-        }
-
-        void StartFlow(UIControllerFlow controllerFlow)
-        {
-            var uiProvider = ServiceProvider.GetExportedValue<IUIProvider>();
-            uiProvider.RunUI(controllerFlow, null);
         }
 
         void OnThemeChanged()

@@ -20,6 +20,17 @@ namespace GitHub.Services
             this.serviceProvider = serviceProvider;
         }
 
+        public void HideNotification(Guid guid)
+        {
+            // status bar only shows text, this is a noop
+        }
+
+        public bool IsNotificationVisible(Guid guid)
+        {
+            // it's only text, there's no way of checking
+            return false;
+        }
+
         public void ShowError(string message)
         {
             ShowText(message);
@@ -30,7 +41,7 @@ namespace GitHub.Services
             ShowText(message);
         }
 
-        public void ShowMessage(string message, ICommand command)
+        public void ShowMessage(string message, ICommand command, bool showToolTips = true, Guid guid = default(Guid))
         {
             ShowText(message);
         }
@@ -42,7 +53,7 @@ namespace GitHub.Services
 
         void ShowText(string text)
         {
-            var statusBar = serviceProvider.TryGetService<IVsStatusbar>();
+            var statusBar = serviceProvider.GetServiceSafe<IVsStatusbar>();
             int frozen;
             if (!ErrorHandler.Succeeded(statusBar.IsFrozen(out frozen)))
                 return;
